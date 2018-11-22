@@ -80,12 +80,15 @@ class WUserOutput : public op::WorkerConsumer<std::shared_ptr<std::vector<UserDa
 {
 private:
 	SOCKET _clientSocket = INVALID_SOCKET;
-	bool isPrintData = false;
-	bool isShowImage = true;
-	string tcpMsgDelimiter = "[TCP]";
+	bool _isPrintData = false;
+	bool _isShowImage = true;
+	string _tcpMsgDelimiter = "[TCP]";
 
 public:
 	void setClientSocket(SOCKET clientSocket);
+	void setIsPrintData(bool isPrintData);
+	void setIsShowImage(bool isShowImage);
+	
 	int sendData(const std::shared_ptr<std::vector<UserDatum>>& datumsPtr);
 	void printData(const std::shared_ptr<std::vector<UserDatum>>& datumsPtr);
 
@@ -97,6 +100,8 @@ public:
 
 
 /* function declarations */
+
+bool checkBoolCommandLineArgument(char *arg);
 
 /* Winsock server declarations */
 int initializeTcpServer(int port, SOCKET *listenSocket);
@@ -122,163 +127,14 @@ string getSimplifiedJsonFromPoseKeyPoints(op::Array<float> poseKeyPoints);
 /* end of function declarations */
 
 
-/* WUserOutput class implementation */
+/* main functions */
 
-// The W-classes can be implemented either as a template or as simple classes given
-// that the user usually knows which kind of data he will move between the queues,
-// in this case we assume a std::shared_ptr of a std::vector of UserDatum
-
-// This worker will just read and return all the jpg files in a directory
-void WUserOutput::setClientSocket(SOCKET clientSocket)
-	{
-		_clientSocket = clientSocket;
-	}
-
-int WUserOutput::sendData(const std::shared_ptr<std::vector<UserDatum>>& datumsPtr)
-	{
-		if (_clientSocket == INVALID_SOCKET)
-		{
-			op::log("Can't send data. Client socket is invalid.");
-			return 1;
-		}
-		else
-		{
-			op::log("Client socket is valid. About to send data.");
-		}
-
-		const auto& poseKeypoints = datumsPtr->at(0).poseKeypoints;
-		string jsonPose = getSimplifiedJsonFromPoseKeyPoints(poseKeypoints);
-
-		string msgToSend = jsonPose + tcpMsgDelimiter;
-		
-
-		// send something
-		int iSendResult;
-		const char *sendbuf = msgToSend.c_str();
-		int sendBufStrLen = (int)strlen(sendbuf);
-		iSendResult = send(_clientSocket, sendbuf, sendBufStrLen, 0);
-		if (iSendResult == SOCKET_ERROR) {
-			printf("send failed with error: %d\n", WSAGetLastError());
-			closesocket(_clientSocket);
-			//WSACleanup();
-			return 2;
-		}
-
-		op::log("Sent message: ");
-		op::log(msgToSend);
-
-
-		return 0;
-	}
-
-void WUserOutput::printData(const std::shared_ptr<std::vector<UserDatum>>& datumsPtr)
-	{
-		// Show in command line the resulting pose keypoints for body, face and hands
-		op::log("\nKeypoints:");
-		// Accesing each element of the keypoints
-		const auto& poseKeypoints = datumsPtr->at(0).poseKeypoints;
-		op::log("Person pose keypoints:");
-		for (auto person = 0; person < poseKeypoints.getSize(0); person++)
-		{
-			op::log("Person " + std::to_string(person) + " (x, y, score):");
-			for (auto bodyPart = 0; bodyPart < poseKeypoints.getSize(1); bodyPart++)
-			{
-				std::string valueToPrint;
-				for (auto xyscore = 0; xyscore < poseKeypoints.getSize(2); xyscore++)
-				{
-					valueToPrint += std::to_string(poseKeypoints[{person, bodyPart, xyscore}]) + " ";
-				}
-				op::log(valueToPrint);
-			}
-		}
-
-
-		op::log(" ");
-		// Alternative: just getting std::string equivalent
-		op::log("Face keypoints: " + datumsPtr->at(0).faceKeypoints.toString());
-		op::log("Left hand keypoints: " + datumsPtr->at(0).handKeypoints[0].toString());
-		op::log("Right hand keypoints: " + datumsPtr->at(0).handKeypoints[1].toString());
-		// Heatmaps
-		const auto& poseHeatMaps = datumsPtr->at(0).poseHeatMaps;
-		if (!poseHeatMaps.empty())
-		{
-			op::log("Pose heatmaps size: [" + std::to_string(poseHeatMaps.getSize(0)) + ", "
-				+ std::to_string(poseHeatMaps.getSize(1)) + ", "
-				+ std::to_string(poseHeatMaps.getSize(2)) + "]");
-			const auto& faceHeatMaps = datumsPtr->at(0).faceHeatMaps;
-			op::log("Face heatmaps size: [" + std::to_string(faceHeatMaps.getSize(0)) + ", "
-				+ std::to_string(faceHeatMaps.getSize(1)) + ", "
-				+ std::to_string(faceHeatMaps.getSize(2)) + ", "
-				+ std::to_string(faceHeatMaps.getSize(3)) + "]");
-			const auto& handHeatMaps = datumsPtr->at(0).handHeatMaps;
-			op::log("Left hand heatmaps size: [" + std::to_string(handHeatMaps[0].getSize(0)) + ", "
-				+ std::to_string(handHeatMaps[0].getSize(1)) + ", "
-				+ std::to_string(handHeatMaps[0].getSize(2)) + ", "
-				+ std::to_string(handHeatMaps[0].getSize(3)) + "]");
-			op::log("Right hand heatmaps size: [" + std::to_string(handHeatMaps[1].getSize(0)) + ", "
-				+ std::to_string(handHeatMaps[1].getSize(1)) + ", "
-				+ std::to_string(handHeatMaps[1].getSize(2)) + ", "
-				+ std::to_string(handHeatMaps[1].getSize(3)) + "]");
-		}
-	}
-
-void WUserOutput::initializationOnThread() {}
-
-void WUserOutput::workConsumer(const std::shared_ptr<std::vector<UserDatum>>& datumsPtr)
-	{	
-		try
-		{
-			// User's displaying/saving/other processing here
-			// datum.cvOutputData: rendered frame with pose or heatmaps
-			// datum.poseKeypoints: Array<float> with the estimated pose
-			if (datumsPtr != nullptr && !datumsPtr->empty())
-			{
-				int iSendResult = this->sendData(datumsPtr);
-				if (iSendResult != 0)
-				{
-					throw exception("Failed to send data: " + iSendResult);
-				}
-
-				if (isPrintData)
-				{
-					printData(datumsPtr);
-				}
-
-				// Display rendered output image
-				if (isShowImage)
-				{
-					cv::imshow("User worker GUI", datumsPtr->at(0).cvOutputData);
-				}
-								
-				// Display image and sleeps at least 1 ms (it usually sleeps ~5-10 msec to display the image)
-				const char key = (char)cv::waitKey(1);
-				if (key == 27)  // ESC
-					this->stop();
-			}
-		}
-		catch (const std::exception& e)
-		{
-			this->stop();			
-						
-			//op::error(e.what(), __LINE__, __FUNCTION__, __FILE__);
-			op::log(e.what());
-		}
-	}
-
-/* end of WUserOutput class implementation */
-
-
-int tutorialApiCpp8()
+int tutorialApiCpp8(string tcpMsgDelimiter, int portToUse,
+	bool isShowImage, bool isPrintData)
 {
 	try
 	{
 		/* setting up server */
-
-		// TODO: should read the below from command line arguments
-		int portToUse = 27156;
-		string modelDirPath = "";
-		string tcpMsgDelimiter = "";
-
 		int iResult;
 		SOCKET ListenSocket = INVALID_SOCKET;
 		SOCKET ClientSocket = INVALID_SOCKET;
@@ -417,6 +273,8 @@ int tutorialApiCpp8()
 
 			// https://docs.microsoft.com/en-us/cpp/cpp/how-to-create-and-use-shared-ptr-instances?view=vs-2017
 			wUserOutput->setClientSocket(ClientSocket);
+			wUserOutput->setIsPrintData(isPrintData);
+			wUserOutput->setIsShowImage(isShowImage);
 
 			// Start, run, and stop processing - exec() blocks this thread until OpenPose wrapper has finished
 			op::log("Starting thread(s)...", op::Priority::High);
@@ -452,13 +310,201 @@ int tutorialApiCpp8()
 
 int main(int argc, char *argv[])
 {
+	// OpenPose
 	// Parsing command line flags
 	gflags::ParseCommandLineFlags(&argc, &argv, true);
 
+	// getting command line arguments
+
+	// command line usage
+	// --camera and --process_real_time flag is for OpenPose
+	// isShowImage and isPrintData are boolean flag, 1 = true, 0 = false
+	// e.g. 100Most-Interactive-Tree-OpenPose-Server-Video [TCP] 27156 isShowImage isPrintData --camera 0 --process_real_time
+	string usageMsg = 
+		"Usage: 100Most-Interactive-Tree-OpenPose-Server-Video tcpMsgDelimiter portToListen isShowImage isPrintData --camera 0 --process_real_time";
+	if (argc != 5)
+	{
+		op::log(usageMsg);
+		return 1;
+	}
+	string tcpMsgDelimiter = string(argv[1]);
+	int portToUse = stoi(argv[2]);
+	bool isShowImage = checkBoolCommandLineArgument(argv[3]);
+	bool isPrintData = checkBoolCommandLineArgument(argv[4]);
+
 	// Running tutorialApiCpp8
-	return tutorialApiCpp8();
+	return tutorialApiCpp8(tcpMsgDelimiter, portToUse, isShowImage, isPrintData);
 }
 
+/* end of main functions */
+
+
+/* WUserOutput class implementation */
+
+// The W-classes can be implemented either as a template or as simple classes given
+// that the user usually knows which kind of data he will move between the queues,
+// in this case we assume a std::shared_ptr of a std::vector of UserDatum
+
+// This worker will just read and return all the jpg files in a directory
+void WUserOutput::setClientSocket(SOCKET clientSocket)
+{
+	_clientSocket = clientSocket;
+}
+
+void WUserOutput::setIsPrintData(bool isPrintData)
+{
+	_isPrintData = isPrintData;
+}
+
+void WUserOutput::setIsShowImage(bool isShowImage)
+{
+	_isShowImage = isShowImage;
+}
+
+
+int WUserOutput::sendData(const std::shared_ptr<std::vector<UserDatum>>& datumsPtr)
+{
+	if (_clientSocket == INVALID_SOCKET)
+	{
+		op::log("Can't send data. Client socket is invalid.");
+		return 1;
+	}
+	/*else
+	{
+		op::log("Client socket is valid. About to send data.");
+	}*/
+
+	const auto& poseKeypoints = datumsPtr->at(0).poseKeypoints;
+	string jsonPose = getSimplifiedJsonFromPoseKeyPoints(poseKeypoints);
+
+	string msgToSend = jsonPose + _tcpMsgDelimiter;
+
+
+	// send something
+	int iSendResult;
+	const char *sendbuf = msgToSend.c_str();
+	int sendBufStrLen = (int)strlen(sendbuf);
+	iSendResult = send(_clientSocket, sendbuf, sendBufStrLen, 0);
+	if (iSendResult == SOCKET_ERROR) {
+		printf("send failed with error: %d\n", WSAGetLastError());
+		closesocket(_clientSocket);
+		//WSACleanup();
+		return 2;
+	}
+
+	if (_isPrintData)
+	{
+		op::log("Sent message: ");
+		op::log(msgToSend);
+	}
+
+	return 0;
+}
+
+void WUserOutput::printData(const std::shared_ptr<std::vector<UserDatum>>& datumsPtr)
+{
+	// Show in command line the resulting pose keypoints for body, face and hands
+	op::log("\nKeypoints:");
+	// Accesing each element of the keypoints
+	const auto& poseKeypoints = datumsPtr->at(0).poseKeypoints;
+	op::log("Person pose keypoints:");
+	for (auto person = 0; person < poseKeypoints.getSize(0); person++)
+	{
+		op::log("Person " + std::to_string(person) + " (x, y, score):");
+		for (auto bodyPart = 0; bodyPart < poseKeypoints.getSize(1); bodyPart++)
+		{
+			std::string valueToPrint;
+			for (auto xyscore = 0; xyscore < poseKeypoints.getSize(2); xyscore++)
+			{
+				valueToPrint += std::to_string(poseKeypoints[{person, bodyPart, xyscore}]) + " ";
+			}
+			op::log(valueToPrint);
+		}
+	}
+
+
+	op::log(" ");
+	// Alternative: just getting std::string equivalent
+	op::log("Face keypoints: " + datumsPtr->at(0).faceKeypoints.toString());
+	op::log("Left hand keypoints: " + datumsPtr->at(0).handKeypoints[0].toString());
+	op::log("Right hand keypoints: " + datumsPtr->at(0).handKeypoints[1].toString());
+	// Heatmaps
+	const auto& poseHeatMaps = datumsPtr->at(0).poseHeatMaps;
+	if (!poseHeatMaps.empty())
+	{
+		op::log("Pose heatmaps size: [" + std::to_string(poseHeatMaps.getSize(0)) + ", "
+			+ std::to_string(poseHeatMaps.getSize(1)) + ", "
+			+ std::to_string(poseHeatMaps.getSize(2)) + "]");
+		const auto& faceHeatMaps = datumsPtr->at(0).faceHeatMaps;
+		op::log("Face heatmaps size: [" + std::to_string(faceHeatMaps.getSize(0)) + ", "
+			+ std::to_string(faceHeatMaps.getSize(1)) + ", "
+			+ std::to_string(faceHeatMaps.getSize(2)) + ", "
+			+ std::to_string(faceHeatMaps.getSize(3)) + "]");
+		const auto& handHeatMaps = datumsPtr->at(0).handHeatMaps;
+		op::log("Left hand heatmaps size: [" + std::to_string(handHeatMaps[0].getSize(0)) + ", "
+			+ std::to_string(handHeatMaps[0].getSize(1)) + ", "
+			+ std::to_string(handHeatMaps[0].getSize(2)) + ", "
+			+ std::to_string(handHeatMaps[0].getSize(3)) + "]");
+		op::log("Right hand heatmaps size: [" + std::to_string(handHeatMaps[1].getSize(0)) + ", "
+			+ std::to_string(handHeatMaps[1].getSize(1)) + ", "
+			+ std::to_string(handHeatMaps[1].getSize(2)) + ", "
+			+ std::to_string(handHeatMaps[1].getSize(3)) + "]");
+	}
+}
+
+
+void WUserOutput::initializationOnThread() {}
+
+void WUserOutput::workConsumer(const std::shared_ptr<std::vector<UserDatum>>& datumsPtr)
+{
+	try
+	{
+		// User's displaying/saving/other processing here
+		// datum.cvOutputData: rendered frame with pose or heatmaps
+		// datum.poseKeypoints: Array<float> with the estimated pose
+		if (datumsPtr != nullptr && !datumsPtr->empty())
+		{
+			int iSendResult = this->sendData(datumsPtr);
+			if (iSendResult != 0)
+			{
+				throw exception("Failed to send data: " + iSendResult);
+			}
+
+			if (_isPrintData)
+			{
+				printData(datumsPtr);
+			}
+
+			// Display rendered output image
+			if (_isShowImage)
+			{
+				cv::imshow("User worker GUI", datumsPtr->at(0).cvOutputData);
+			}
+
+			// Display image and sleeps at least 1 ms (it usually sleeps ~5-10 msec to display the image)
+			const char key = (char)cv::waitKey(1);
+			if (key == 27)  // ESC
+				this->stop();
+		}
+	}
+	catch (const std::exception& e)
+	{
+		this->stop();
+
+		//op::error(e.what(), __LINE__, __FUNCTION__, __FILE__);
+		op::log(e.what());
+	}
+}
+
+/* end of WUserOutput class implementation */
+
+
+/* function implementations */
+
+bool checkBoolCommandLineArgument(char *arg)
+{
+	return string(arg) == "1";
+}
 
 /* Winsock server implementations */
 
@@ -645,3 +691,5 @@ void constructOpenPoseWorkerWrapper
 }
 
 /* end of openpose implementations */
+
+/* end of function implementations */
