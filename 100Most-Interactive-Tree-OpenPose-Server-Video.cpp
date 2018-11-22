@@ -129,7 +129,7 @@ string getSimplifiedJsonFromPoseKeyPoints(op::Array<float> poseKeyPoints);
 
 /* main functions */
 
-int tutorialApiCpp8(string tcpMsgDelimiter, int portToUse,
+int tutorialApiCpp8(string modelDirPath, string tcpMsgDelimiter, int portToUse,
 	bool isShowImage, bool isPrintData)
 {
 	try
@@ -199,11 +199,12 @@ int tutorialApiCpp8(string tcpMsgDelimiter, int portToUse,
 		// Configure OpenPose wrapper					
 
 		// Pose configuration (use WrapperStructPose{} for default and recommended configuration)
+		string modelDirToUse = modelDirPath + "/";
 		const op::WrapperStructPose wrapperStructPose{
 			!FLAGS_body_disable, netInputSize, outputSize, keypointScale, FLAGS_num_gpu, FLAGS_num_gpu_start,
 			FLAGS_scale_number, (float)FLAGS_scale_gap, op::flagsToRenderMode(FLAGS_render_pose, multipleView),
 			poseModel, !FLAGS_disable_blending, (float)FLAGS_alpha_pose, (float)FLAGS_alpha_heatmap,
-			FLAGS_part_to_show, FLAGS_model_folder, heatMapTypes, heatMapScale, FLAGS_part_candidates,
+			FLAGS_part_to_show, modelDirToUse, heatMapTypes, heatMapScale, FLAGS_part_candidates,
 			(float)FLAGS_render_threshold, FLAGS_number_people_max, enableGoogleLogging };		
 		// Face configuration (use op::WrapperStructFace{} to disable it)
 		const op::WrapperStructFace wrapperStructFace{
@@ -321,19 +322,20 @@ int main(int argc, char *argv[])
 	// isShowImage and isPrintData are boolean flag, 1 = true, 0 = false
 	// e.g. 100Most-Interactive-Tree-OpenPose-Server-Video [TCP] 27156 isShowImage isPrintData --camera 0 --process_real_time
 	string usageMsg = 
-		"Usage: 100Most-Interactive-Tree-OpenPose-Server-Video tcpMsgDelimiter portToListen isShowImage isPrintData --camera 0 --process_real_time";
-	if (argc != 5)
+		"Usage: 100Most-Interactive-Tree-OpenPose-Server-Video modelDirPath tcpMsgDelimiter portToListen isShowImage isPrintData --camera 0 --process_real_time";
+	if (argc != 6)
 	{
 		op::log(usageMsg);
 		return 1;
 	}
-	string tcpMsgDelimiter = string(argv[1]);
-	int portToUse = stoi(argv[2]);
-	bool isShowImage = checkBoolCommandLineArgument(argv[3]);
-	bool isPrintData = checkBoolCommandLineArgument(argv[4]);
+	string modelDirPath = string(argv[1]);
+	string tcpMsgDelimiter = string(argv[2]);
+	int portToUse = stoi(argv[3]);
+	bool isShowImage = checkBoolCommandLineArgument(argv[4]);
+	bool isPrintData = checkBoolCommandLineArgument(argv[5]);
 
 	// Running tutorialApiCpp8
-	return tutorialApiCpp8(tcpMsgDelimiter, portToUse, isShowImage, isPrintData);
+	return tutorialApiCpp8(modelDirPath, tcpMsgDelimiter, portToUse, isShowImage, isPrintData);
 }
 
 /* end of main functions */
