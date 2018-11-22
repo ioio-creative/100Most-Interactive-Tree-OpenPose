@@ -320,9 +320,9 @@ int main(int argc, char *argv[])
 	// command line usage
 	// --camera and --process_real_time flag is for OpenPose
 	// isShowImage and isPrintData are boolean flag, 1 = true, 0 = false
-	// e.g. 100Most-Interactive-Tree-OpenPose-Server-Video [TCP] 27156 isShowImage isPrintData --camera 0 --process_real_time
+	// e.g. 100Most-Interactive-Tree-OpenPose-Server-Video [TCP] 27156 isShowImage isPrintData --camera 0 --process_real_time --keypoint_scale 3
 	string usageMsg = 
-		"Usage: 100Most-Interactive-Tree-OpenPose-Server-Video modelDirPath tcpMsgDelimiter portToListen isShowImage isPrintData --camera 0 --process_real_time";
+		"Usage: 100Most-Interactive-Tree-OpenPose-Server-Video modelDirPath tcpMsgDelimiter portToListen isShowImage isPrintData --camera 0 --process_real_time --keypoint_scale 3";
 	if (argc != 6)
 	{
 		op::log(usageMsg);
