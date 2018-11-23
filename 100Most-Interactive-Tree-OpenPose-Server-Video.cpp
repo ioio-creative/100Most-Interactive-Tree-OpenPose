@@ -88,6 +88,7 @@ public:
 	void setClientSocket(SOCKET clientSocket);
 	void setIsPrintData(bool isPrintData);
 	void setIsShowImage(bool isShowImage);
+	void printNumOfPeople(const std::shared_ptr<std::vector<UserDatum>>& datumsPtr);
 	
 	int sendData(const std::shared_ptr<std::vector<UserDatum>>& datumsPtr);
 	void printData(const std::shared_ptr<std::vector<UserDatum>>& datumsPtr);
@@ -148,8 +149,7 @@ int tutorialApiCpp8(string modelDirPath, string tcpMsgDelimiter, int portToUse,
 		/* end of setting up server */
 
 
-		op::log("Starting OpenPose demo...", op::Priority::High);
-		const auto timerBegin = std::chrono::high_resolution_clock::now();
+		op::log("Starting OpenPose demo...", op::Priority::High);		
 
 		// logging_level
 		op::check(0 <= FLAGS_logging_level && FLAGS_logging_level <= 255, "Wrong logging_level value.",
@@ -253,6 +253,8 @@ int tutorialApiCpp8(string modelDirPath, string tcpMsgDelimiter, int portToUse,
 				continue;
 			}
 
+			const auto timerBegin = std::chrono::high_resolution_clock::now();
+
 			// Initializing the user custom classes
 			// GUI (Display)
 			auto wUserOutput = std::make_shared<WUserOutput>();
@@ -318,7 +320,9 @@ int main(int argc, char *argv[])
 	// getting command line arguments
 
 	// command line usage
-	// --camera and --process_real_time flag is for OpenPose
+	// --camera, --process_real_time and --keypoint_scale flag is for OpenPose
+	// --keypoint_scale 3 to scale output keypoints in the range [0,1]
+	// https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/demo_overview.md
 	// isShowImage and isPrintData are boolean flag, 1 = true, 0 = false
 	// e.g. 100Most-Interactive-Tree-OpenPose-Server-Video [TCP] 27156 isShowImage isPrintData --camera 0 --process_real_time --keypoint_scale 3
 	string usageMsg = 
@@ -454,6 +458,14 @@ void WUserOutput::printData(const std::shared_ptr<std::vector<UserDatum>>& datum
 	}
 }
 
+void WUserOutput::printNumOfPeople(const std::shared_ptr<std::vector<UserDatum>>& datumsPtr)
+{
+	// Accesing each element of the keypoints
+	const auto& poseKeypoints = datumsPtr->at(0).poseKeypoints;
+	int numOfPeople = poseKeypoints.getSize(0);
+	op::log("People length: " + std::to_string(numOfPeople));
+}
+
 
 void WUserOutput::initializationOnThread() {}
 
@@ -476,6 +488,8 @@ void WUserOutput::workConsumer(const std::shared_ptr<std::vector<UserDatum>>& da
 			{
 				printData(datumsPtr);
 			}
+
+			//printNumOfPeople(datumsPtr);
 
 			// Display rendered output image
 			if (_isShowImage)
@@ -617,30 +631,27 @@ const map<unsigned int, string> POSE_BODY_25_BODY_PARTS{
 	{25, "Background"}
 };
 
-string getSimplifiedJsonFromPoseKeyPoints(op::Array<float> poseKeyPoints)
+string getSimplifiedJsonFromPoseKeyPoints(op::Array<float> poseKeypoints)
 {
 	string jsonResult = "{\"people\":[";
-	const int numOfNumbersPerPoseKeyPoint = 3;
-	const int numOfPoseKeyPointsPerBody = 25;
-	const int numOfNumbersPerBody = numOfNumbersPerPoseKeyPoint * numOfPoseKeyPointsPerBody;
-	int arrayLength = poseKeyPoints.getVolume();
 
-	int numOfBodies = arrayLength / numOfNumbersPerBody;
-
-	for (int i = 0; i < numOfBodies; i++) {
+	for (auto person = 0; person < poseKeypoints.getSize(0); person++)
+	{
 		// start of body
 		jsonResult += "{";
 
-		for (int j = 0; j < numOfPoseKeyPointsPerBody; j++) {
+		for (auto bodyPart = 0; bodyPart < poseKeypoints.getSize(1); bodyPart++)
+		{
 			// start of body part
-			jsonResult += "\"" + POSE_BODY_25_BODY_PARTS.at(j) +
+			jsonResult += "\"" + POSE_BODY_25_BODY_PARTS.at(bodyPart) +
 				"\":[";
 
-			// numOfNumbersPerPoseKeyPoint - 1 because we ignore the 3rd coordinate for each pose key point
-			for (int k = 0; k < numOfNumbersPerPoseKeyPoint - 1; k++) {
+			// poseKeypoints.getSize(2) - 1 because we ignore the 3rd coordinate for each pose key point, which is the confidence score
+			for (auto xyscore = 0; xyscore < poseKeypoints.getSize(2) - 1; xyscore++)
+			{
 				//cout << i * numOfPoseKeyPointsPerBody + j * numOfNumbersPerPoseKeyPoint + k << endl;
-				jsonResult += to_string(poseKeyPoints[i * numOfPoseKeyPointsPerBody + j * numOfNumbersPerPoseKeyPoint + k]) + ",";
-			}			
+				jsonResult += to_string(poseKeypoints[{person, bodyPart, xyscore}]) + ",";
+			}
 
 			// end of body part
 			jsonResult = jsonResult.substr(0, jsonResult.length() - 1);
