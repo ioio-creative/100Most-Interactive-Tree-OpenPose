@@ -15,6 +15,14 @@ Sections below are from the OpenPost library.
 
 
 
+## command line usage
+	1. --camera, --process_real_time and --keypoint_scale flag is for OpenPose
+	2. --keypoint_scale 3 to scale output keypoints in the range [0,1]
+	3. https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/demo_overview.md
+	4. isShowImage and isPrintData are boolean flag, 1 = true, 0 = false
+	5. e.g. 100Most-Interactive-Tree-OpenPose-Server-Video [TCP] 27156 isShowImage isPrintData --camera 0 --process_real_time --keypoint_scale 3
+
+
 Adding and Testing Custom Code
 ====================================
 
@@ -35,7 +43,7 @@ You can quickly add your custom code into this folder so that quick prototypes c
 cd build/
 make -j`nproc`
 # Windows
-# Close Visual Studio, re-run CMake, and re-compile the project in Visual Studio 
+# Close Visual Studio, re-run CMake, and re-compile the project in Visual Studio
 ```
 5. **Run step 4 every time that you make changes into your code**.
 
