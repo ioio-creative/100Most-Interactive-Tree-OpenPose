@@ -222,18 +222,15 @@ int tutorialApiCpp8(string modelDirPath, string tcpMsgDelimiter, int portToUse,
 		const op::WrapperStructInput wrapperStructInput{
 			producerType, producerString, FLAGS_frame_first, FLAGS_frame_step, FLAGS_frame_last,
 			FLAGS_process_real_time, FLAGS_frame_flip, FLAGS_frame_rotate, FLAGS_frames_repeat,
-			cameraSize, FLAGS_camera_fps, FLAGS_camera_parameter_folder, !FLAGS_frame_keep_distortion,
+			cameraSize, FLAGS_camera_parameter_folder, !FLAGS_frame_keep_distortion,
 			(unsigned int)FLAGS_3d_views };		
-		// Consumer (comment or use default argument to disable any output)
-		const auto displayMode = op::DisplayMode::NoDisplay;
-		const bool guiVerbose = false;
-		const bool fullScreen = false;
+		// Output (comment or use default argument to disable any output)
 		const op::WrapperStructOutput wrapperStructOutput{
-			displayMode, guiVerbose, fullScreen, FLAGS_write_keypoint,
-			op::stringToDataFormat(FLAGS_write_keypoint_format), FLAGS_write_json, FLAGS_write_coco_json,
-			FLAGS_write_coco_foot_json, FLAGS_write_coco_json_variant, FLAGS_write_images, FLAGS_write_images_format,
-			FLAGS_write_video, FLAGS_camera_fps, FLAGS_write_heatmaps, FLAGS_write_heatmaps_format,
-			FLAGS_write_video_adam, FLAGS_write_bvh, FLAGS_udp_host, FLAGS_udp_port };		
+			FLAGS_cli_verbose, FLAGS_write_keypoint, op::stringToDataFormat(FLAGS_write_keypoint_format),
+			FLAGS_write_json, FLAGS_write_coco_json, FLAGS_write_coco_foot_json, FLAGS_write_coco_json_variant,
+			FLAGS_write_images, FLAGS_write_images_format, FLAGS_write_video, FLAGS_write_video_fps,
+			FLAGS_write_heatmaps, FLAGS_write_heatmaps_format, FLAGS_write_video_adam, FLAGS_write_bvh, FLAGS_udp_host,
+			FLAGS_udp_port };
 
 
 		// TCP Winsock: accept one connection/client at a time
@@ -645,9 +642,9 @@ string getSimplifiedJsonFromPoseKeyPoints(op::Array<float> poseKeypoints)
 			// start of body part
 			jsonResult += "\"" + POSE_BODY_25_BODY_PARTS.at(bodyPart) +
 				"\":[";
-
-			// poseKeypoints.getSize(2) - 1 because we ignore the 3rd coordinate for each pose key point, which is the confidence score
-			for (auto xyscore = 0; xyscore < poseKeypoints.getSize(2) - 1; xyscore++)
+			
+			// the 3rd coordinate is the confidence score
+			for (auto xyscore = 0; xyscore < poseKeypoints.getSize(2); xyscore++)
 			{
 				//cout << i * numOfPoseKeyPointsPerBody + j * numOfNumbersPerPoseKeyPoint + k << endl;
 				jsonResult += to_string(poseKeypoints[{person, bodyPart, xyscore}]) + ",";
