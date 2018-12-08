@@ -135,20 +135,6 @@ int tutorialApiCpp8(string modelDirPath, string tcpMsgDelimiter, int portToUse,
 {
 	try
 	{
-		/* setting up server */
-		int iResult;
-		SOCKET ListenSocket = INVALID_SOCKET;
-		SOCKET ClientSocket = INVALID_SOCKET;
-
-		iResult = initializeTcpServer(portToUse, &ListenSocket);
-		if (iResult != 0)
-		{
-			return iResult;
-		}
-
-		/* end of setting up server */
-
-
 		op::log("Starting OpenPose demo...", op::Priority::High);		
 
 		// logging_level
@@ -233,6 +219,24 @@ int tutorialApiCpp8(string modelDirPath, string tcpMsgDelimiter, int portToUse,
 			FLAGS_udp_port };
 
 
+
+		/* setting up server */
+
+		int iResult;
+		SOCKET ListenSocket = INVALID_SOCKET;
+		SOCKET ClientSocket = INVALID_SOCKET;
+
+		iResult = initializeTcpServer(portToUse, &ListenSocket);
+		if (iResult != 0)
+		{
+			return iResult;
+		}
+
+		/* end of setting up server */
+
+
+
+
 		// TCP Winsock: accept one connection/client at a time
 		// https://stackoverflow.com/questions/16686444/function-names-conflict-in-c
 		op::log("Port: " + to_string(portToUse) + " is used.");
@@ -251,6 +255,7 @@ int tutorialApiCpp8(string modelDirPath, string tcpMsgDelimiter, int portToUse,
 			}
 
 			const auto timerBegin = std::chrono::high_resolution_clock::now();
+
 
 			// Initializing the user custom classes
 			// GUI (Display)
@@ -279,7 +284,19 @@ int tutorialApiCpp8(string modelDirPath, string tcpMsgDelimiter, int portToUse,
 			// Start, run, and stop processing - exec() blocks this thread until OpenPose wrapper has finished
 			op::log("Starting thread(s)...", op::Priority::High);
 
-			opWrapperT->exec();		
+			opWrapperT->exec();
+			
+
+			/* 
+				!!!Important!!!
+				As I called new op::WrapperT<std::vector<UserDatum>>() in every while loop,
+				if I don't call ::delete, the memory usage will go up when a new connection is made,
+				i.e. when the stuff inside the while() loop is executed once, 
+				until it finally runs out of memory.
+			*/
+			::delete opWrapperT;
+			opWrapperT = nullptr;
+
 
 			// Measuring total time
 			const auto now = std::chrono::high_resolution_clock::now();
@@ -288,7 +305,6 @@ int tutorialApiCpp8(string modelDirPath, string tcpMsgDelimiter, int portToUse,
 			const auto message = "OpenPose demo successfully finished. Total time: "
 				+ std::to_string(totalTimeSec) + " seconds.";
 			op::log(message, op::Priority::High);
-
 
 			op::log("Port: " + to_string(portToUse) + " is used.");
 			op::log("Waiting for incoming socket...");
@@ -513,6 +529,7 @@ void WUserOutput::workConsumer(const std::shared_ptr<std::vector<UserDatum>>& da
 
 
 /* function implementations */
+
 
 bool checkBoolCommandLineArgument(char *arg)
 {
